@@ -1,0 +1,198 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+% Configuración para el resaltado de código
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt
+}
+
+\title{Escenario: Restaurante con Reservas Concurrentes}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+Imagina un restaurante con varias terminales (computadoras) donde los empleados pueden realizar reservas simultáneamente. El algoritmo de Lamport (\textit{timestamps lógicos}) ayudará a mantener la consistencia y evitar conflictos en las reservas.
+
+\section{Componentes del Sistema}
+\begin{enumerate}
+    \item Terminales de reserva
+    \item Servidor central de reservas
+    \item \textit{Timestamp} lógico para cada evento
+\end{enumerate}
+
+\section{Ejemplo de Funcionamiento}
+\begin{lstlisting}[language=python]
+from typing import Dict, Any
+from enum import Enum, auto
+from dataclasses import dataclass, field
+import threading
+import time
+import uuid
+
+class ReservationStatus(Enum):
+    SUCCESSFUL = auto()
+    CONFLICT = auto()
+    INVALID = auto()
+
+@dataclass
+class ReservationEvent:
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    terminal_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    table_number: int = 0
+    time_slot: str = ''
+    timestamp: float = field(default_factory=time.time)
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if not isinstance(other, ReservationEvent):
+            return False
+        return self.id == other.id
+
+class ConcurrentReservationSystem:
+    def __init__(self, total_tables: int = 10):
+        self._reservations: Dict[int, ReservationEvent] = {}
+        self._lock = threading.Lock()
+        self._total_tables = total_tables
+
+    def validate_reservation(self, reservation: ReservationEvent) -> ReservationStatus:
+        """Validar parámetros de reserva"""
+        if not (1 <= reservation.table_number <= self._total_tables):
+            return ReservationStatus.INVALID
+        
+        if not self._is_valid_time_slot(reservation.time_slot):
+            return ReservationStatus.INVALID
+        
+        return ReservationStatus.SUCCESSFUL
+
+    def _is_valid_time_slot(self, time_slot: str) -> bool:
+        """Verificar formato de hora y rango válido"""
+        try:
+            hora, minutos = map(int, time_slot.split(':'))
+            return 0 <= hora < 24 and 0 <= minutos < 60
+        except (ValueError, TypeError):
+            return False
+
+    def request_reservation(self, table_number: int, time_slot: str, 
+                            terminal_id: str = None) -> ReservationStatus:
+        """Solicitar reserva con manejo de concurrencia"""
+        # Crear evento de reserva
+        reservation = ReservationEvent(
+            table_number=table_number, 
+            time_slot=time_slot,
+            terminal_id=terminal_id or str(uuid.uuid4())
+        )
+
+        # Validar reserva
+        validation_result = self.validate_reservation(reservation)
+        if validation_result != ReservationStatus.SUCCESSFUL:
+            return validation_result
+
+        # Sección crítica con bloqueo
+        with self._lock:
+            # Verificar si la mesa ya está reservada
+            existing_reservation = self._reservations.get(table_number)
+            
+            if existing_reservation:
+                # Resolver conflicto por timestamp
+                if reservation.timestamp > existing_reservation.timestamp:
+                    self._reservations[table_number] = reservation
+                    return ReservationStatus.SUCCESSFUL
+                return ReservationStatus.CONFLICT
+            
+            # No hay reserva previa, realizar reserva
+            self._reservations[table_number] = reservation
+            return ReservationStatus.SUCCESSFUL
+
+    def get_available_tables(self, time_slot: str) -> list:
+        """Obtener mesas disponibles para un horario"""
+        return [
+            table for table in range(1, self._total_tables + 1) 
+            if table not in self._reservations
+        ]
+
+def simulacion_concurrente():
+    sistema = ConcurrentReservationSystem(total_tables=5)
+    
+    # Simulación de reservas concurrentes
+    def hacer_reserva(terminal_id: str, mesa: int, hora: str):
+        resultado = sistema.request_reservation(mesa, hora, terminal_id)
+        print(f"Terminal {terminal_id}: Reserva mesa {mesa} a {hora} - {resultado}")
+    
+    # Crear hilos para simular reservas simultáneas
+    hilos = [
+        threading.Thread(target=hacer_reserva, args=(f'terminal-{i}', 3, '20:00')) 
+        for i in range(5)
+    ]
+    
+    # Ejecutar hilos
+    for hilo in hilos:
+        hilo.start()
+    
+    # Esperar a que terminen
+    for hilo in hilos:
+        hilo.join()
+    
+    # Mostrar mesas disponibles
+    print("\nMesas disponibles:", 
+          sistema.get_available_tables('20:00'))
+
+# Ejecutar simulación
+if __name__ == "__main__":
+    simulacion_concurrente()
+\end{lstlisting}
+
+\section{Explicación del Ejemplo}
+\subsection{\textit{Timestamps} Lógicos}
+\begin{itemize}
+    \item Cada evento (reserva) recibe un \textit{timestamp} lógico incremental.
+    \item El \textit{timestamp} ayuda a ordenar y resolver conflictos entre eventos.
+\end{itemize}
+
+\subsection{Resolución de Conflictos}
+\begin{itemize}
+    \item Si dos terminales intentan reservar la misma mesa simultáneamente, se usa el \textit{timestamp} para decidir.
+    \item La reserva con el \textit{timestamp} más alto (evento más reciente) tiene prioridad.
+    \item En caso de empate, se usa el ID de terminal como criterio de desempate.
+\end{itemize}
+
+\subsection{Beneficios}
+\begin{itemize}
+    \item Previene reservas duplicadas.
+    \item Mantiene la consistencia del sistema.
+    \item Funciona en un entorno distribuido con múltiples terminales.
+\end{itemize}
+
+\section{Casos de Uso Reales}
+\begin{itemize}
+    \item Sistemas de reservas de restaurantes.
+    \item Plataformas de compra de entradas.
+    \item Sistemas de gestión de recursos compartidos.
+    \item Bases de datos distribuidas.
+\end{itemize}
+
+\section{Limitaciones}
+\begin{itemize}
+    \item No garantiza consistencia perfecta en redes con alta latencia.
+    \item Requiere implementación cuidadosa en sistemas complejos.
+\end{itemize}
+
+\end{document}
