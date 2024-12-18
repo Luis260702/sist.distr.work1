@@ -1,0 +1,97 @@
+\documentclass{article}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codeblue}{rgb}{0,0,0.8}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{backcolor}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolor},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{codeblue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{red},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\begin{document}
+
+\section*{Algoritmo de Berkeley en Python}
+
+\subsection*{Código Python}
+\begin{lstlisting}[language=Python, caption={Implementación del Algoritmo de Berkeley}]
+import datetime
+
+# Función para calcular la diferencia de tiempo en segundos
+def calcular_diferencia(hora_nodo, hora_referencia):
+    diferencia = (hora_nodo - hora_referencia).total_seconds()
+    return diferencia
+
+# Función principal que implementa el algoritmo de Berkeley
+def algoritmo_berkeley(horas_nodos):
+    # El primer nodo (0) actúa como el coordinador
+    hora_coordinador = horas_nodos[0]
+
+    # Calcular las diferencias de tiempo entre cada nodo y el coordinador
+    diferencias = []
+    for hora_nodo in horas_nodos:
+        diferencia = calcular_diferencia(hora_nodo, hora_coordinador)
+        diferencias.append(diferencia)
+
+    # Promediar las diferencias (excluyendo al nodo coordinador)
+    promedio_diferencia = sum(diferencias) / len(diferencias)
+
+    # Ajustar las horas basándose en el promedio calculado
+    horas_ajustadas = []
+    for hora_nodo in horas_nodos:
+        ajuste = datetime.timedelta(seconds=promedio_diferencia)
+        nueva_hora = hora_nodo + ajuste
+        horas_ajustadas.append(nueva_hora)
+
+    return horas_ajustadas
+
+# Ejemplo práctico: horas de los nodos
+horas_nodos = [
+    datetime.datetime(2024, 12, 18, 12, 0, 0),  # Nodo 0 (coordinador)
+    datetime.datetime(2024, 12, 18, 12, 1, 30),  # Nodo 1
+    datetime.datetime(2024, 12, 18, 11, 58, 50), # Nodo 2
+    datetime.datetime(2024, 12, 18, 12, 2, 10),  # Nodo 3
+]
+
+# Ejecutar el algoritmo de Berkeley
+horas_ajustadas = algoritmo_berkeley(horas_nodos)
+
+# Imprimir los resultados
+print("Horas originales de los nodos:")
+for i, hora in enumerate(horas_nodos):
+    print(f"Nodo {i}: {hora}")
+
+print("\nHoras ajustadas de los nodos:")
+for i, hora in enumerate(horas_ajustadas):
+    print(f"Nodo {i}: {hora}")
+\end{lstlisting}
+
+\subsection*{Explicación del Código}
+\begin{enumerate}
+    \item \textbf{Entrada}: La lista \texttt{horas\_nodos} contiene las horas actuales de los nodos.
+    \item \textbf{Coordinador}: El primer nodo (\texttt{Nodo 0}) actúa como el coordinador.
+    \item \textbf{Diferencias}: Se calculan las diferencias de tiempo entre los nodos y el coordinador.
+    \item \textbf{Promedio}: Se calcula el promedio de las diferencias.
+    \item \textbf{Ajuste}: Cada nodo ajusta su hora basándose en el promedio.
+\end{enumerate}
+
+\end{document}
