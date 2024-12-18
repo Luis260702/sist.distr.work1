@@ -1,0 +1,71 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+
+\title{Conceptos Clave sobre Transacciones y Servicios Web}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Propiedad A.C.I.D. en las transacciones}
+\begin{itemize}
+    \item \textbf{Atomicidad}: Una transacción debe ejecutarse completamente o no ejecutarse en absoluto.
+    \item \textbf{Consistencia}: El resultado de una transacción no debe depender del número de clientes concurrentes.
+    \item \textbf{Aislamiento}: Los efectos intermedios de las transacciones no deben ser visibles a otras.
+    \item \textbf{Durabilidad}: La información debe guardarse en disco una vez que la transacción se ejecuta exitosamente.
+\end{itemize}
+
+\section{Reglas de operación de los candados en las transacciones}
+\begin{itemize}
+    \item Se usan para bloquear el acceso a una región crítica y evitar conflictos entre usuarios concurrentes.
+\end{itemize}
+
+\section{Qué pasa con un dato cuando se aborta una transacción}
+\begin{itemize}
+    \item Cuando una transacción se aborta, es necesario realizar un procedimiento de recuperación para revertir las operaciones ya realizadas.
+\end{itemize}
+
+\section{Ejemplos del uso de los servicios web}
+\begin{itemize}
+    \item Reservación de viajes, donde un \textit{agente de viajes} combina servicios de diferentes sitios como vuelos, hoteles y alquiler de autos.
+\end{itemize}
+
+\section{Ejemplo de escritura prematura para una concurrencia}
+\begin{itemize}
+    \item Ocurre cuando dos transacciones escriben en el mismo dato simultáneamente. Para evitarlo, se proponen versiones tentativas para retrasar la escritura.
+\end{itemize}
+
+\section{Razón principal por la que los servicios web son soportados por el TCP}
+\begin{itemize}
+    \item TCP utiliza el puerto 80, que generalmente no es bloqueado por firewalls, permitiendo que los servicios web se comuniquen sin restricciones.
+\end{itemize}
+
+\section{Caso de una lectura sucia en una transacción}
+\begin{itemize}
+    \item Ocurre cuando una transacción lee datos modificados por una transacción abortada. La solución es retrasar la validación de una transacción exitosa hasta que todas las relacionadas también sean exitosas.
+\end{itemize}
+
+\section{Por qué el \textit{acoplamiento débil} es una característica deseada en los servicios web}
+\begin{itemize}
+    \item Minimiza las dependencias entre servicios, haciendo que la arquitectura sea más flexible y menos propensa a fallas en cascada.
+\end{itemize}
+
+\section{Ejemplo de transacción anidada}
+\begin{itemize}
+    \item Una transacción anidada puede incluir subtransacciones jerárquicas, donde una subtransacción puede abortar sin afectar a su padre.
+\end{itemize}
+
+\section{Ejemplo de transacción distribuida}
+\begin{itemize}
+    \item Una transacción que implica múltiples servidores con un coordinador que decide si abortar o declarar exitosa la transacción.
+\end{itemize}
+
+\section{Función de los candados en una transacción}
+\begin{itemize}
+    \item Evitan accesos concurrentes a una región crítica para preservar la consistencia y evitar conflictos.
+\end{itemize}
+
+\end{document}
