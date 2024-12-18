@@ -1,0 +1,143 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Configuración para el resaltado de código
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt
+}
+
+\title{Configuración de un Proyecto Docker con Python}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Crea un directorio para tu proyecto}
+\begin{lstlisting}[language=bash]
+mkdir docker-leader-example
+cd docker-leader-example
+\end{lstlisting}
+
+\section{Crea un archivo \texttt{requirements.txt} para listar las dependencias de Python}
+\begin{lstlisting}[language=]
+flask
+requests
+\end{lstlisting}
+
+\section{Crea un archivo \texttt{main.py} con un código básico de Flask}
+\begin{lstlisting}[language=python]
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Hello, Docker World!"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+\end{lstlisting}
+
+\section{Crear un Dockerfile no optimizado}
+\subsection{Crear el archivo Dockerfile}
+\begin{lstlisting}[language=bash]
+nano Dockerfile
+\end{lstlisting}
+
+\subsection{Añadir el siguiente contenido no optimizado}
+\begin{lstlisting}[language=Dockerfile]
+FROM ubuntu:latest
+
+RUN apt-get update && apt-get install -y python3 python3-pip
+RUN apt-get install -y git
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+CMD ["python3", "main.py"]
+\end{lstlisting}
+
+\subsection{Construir la imagen y observar el tiempo que tarda}
+\begin{lstlisting}[language=bash]
+docker build -t unoptimized-app .
+\end{lstlisting}
+
+\subsection{Ejecutar el contenedor}
+\begin{lstlisting}[language=bash]
+docker run -p 5000:5000 unoptimized-app
+\end{lstlisting}
+
+\subsection{Verificar el servidor en el navegador}
+Accede a \url{http://localhost:5000} y verifica que el servidor está funcionando.
+
+\section{Optimizar el Dockerfile}
+\subsection{Editar el Dockerfile para aplicar las optimizaciones}
+\begin{lstlisting}[language=bash]
+nano Dockerfile
+\end{lstlisting}
+
+\subsection{Cambiar el contenido del Dockerfile}
+\begin{lstlisting}[language=Dockerfile]
+# Usar una imagen base ligera
+FROM python:3.9-slim
+
+# Instalar dependencias necesarias en una sola capa
+RUN apt-get update && apt-get install -y git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copiar solo requirements.txt primero para aprovechar el cache de Docker
+COPY requirements.txt /app/
+WORKDIR /app
+RUN pip install -r requirements.txt
+
+# Copiar el resto del código
+COPY . /app
+
+# Comando para ejecutar la aplicación
+CMD ["python3", "main.py"]
+\end{lstlisting}
+
+\subsection{Reconstruir la imagen optimizada}
+\begin{lstlisting}[language=bash]
+docker build -t optimized-app .
+\end{lstlisting}
+
+\subsection{Observar la reducción en el tiempo de construcción}
+La optimización permite un mejor uso de las capas, reduciendo el tiempo de construcción.
+
+\section{Probar el Contenedor Optimizado}
+\begin{lstlisting}[language=bash]
+docker run -p 5000:5000 optimized-app
+\end{lstlisting}
+
+Accede a \url{http://localhost:5000} y verifica que funciona correctamente.
+
+\section{Comparar Resultados}
+\subsection{Tiempos de construcción}
+Usa el tiempo de construcción de ambas versiones para comparar:
+\begin{lstlisting}[language=bash]
+docker build -t unoptimized-app .  # Tiempo: ~60 segundos
+docker build -t optimized-app .   # Tiempo: ~30 segundos
+\end{lstlisting}
+
+\subsection{Tamaño de la imagen}
+Compara los tamaños de las imágenes creadas:
+\begin{lstlisting}[language=bash]
+docker images
+\end{lstlisting}
+
+Verás que la versión optimizada usa menos espacio debido a la imagen base ligera.
+
+\end{document}
