@@ -1,0 +1,110 @@
+\documentclass{article}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codeblue}{rgb}{0,0,0.8}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{backcolor}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolor},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{codeblue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{red},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\begin{document}
+
+\section*{Código: Algoritmo de Cristian en Python}
+
+\subsection*{Código Python}
+\begin{lstlisting}[language=Python, caption={Implementación del Algoritmo de Cristian}]
+import time
+import socket
+import threading
+
+# Servidor
+def time_server():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_address = ("127.0.0.1", 12345)
+    server_socket.bind(server_address)
+
+    print("Servidor de tiempo esperando consultas...")
+
+    while True:
+        data, client_address = server_socket.recvfrom(1024)
+        if data.decode() == "TIME_REQUEST":
+            server_time = time.time()  # Obtener el tiempo actual del servidor
+            server_socket.sendto(str(server_time).encode(), client_address)
+
+# Cliente
+def time_client():
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_address = ("127.0.0.1", 12345)
+
+    # Marcar el tiempo de envío de la solicitud
+    t1 = time.time()
+    client_socket.sendto("TIME_REQUEST".encode(), server_address)
+
+    # Recibir el tiempo del servidor
+    data, _ = client_socket.recvfrom(1024)
+    t2 = time.time()  # Marcar el tiempo de recepción
+
+    server_time = float(data.decode())
+
+    # Calcular el tiempo ajustado en el cliente
+    latency = (t2 - t1) / 2
+    adjusted_time = server_time + latency
+
+    print(f"Tiempo en el servidor: {server_time}")
+    print(f"Latencia estimada: {latency}")
+    print(f"Tiempo ajustado en el cliente: {adjusted_time}")
+
+# Ejecución en Jupyter Notebook
+if __name__ == "__main__":
+    # Inicia el servidor en un hilo separado
+    server_thread = threading.Thread(target=time_server, daemon=True)
+    server_thread.start()
+
+    # Ejecuta el cliente después de un breve tiempo para asegurar que el servidor esté listo
+    time.sleep(1)
+    time_client()
+\end{lstlisting}
+
+\subsection*{Explicación del Código}
+
+\begin{enumerate}
+    \item \textbf{Servidor}:
+    \begin{itemize}
+        \item Escucha solicitudes de tiempo en una dirección IP y puerto específicos.
+        \item Cuando recibe un mensaje con el contenido \texttt{TIME\_REQUEST}, responde con la marca de tiempo actual del servidor.
+    \end{itemize}
+    \item \textbf{Cliente}:
+    \begin{itemize}
+        \item Envía una solicitud de tiempo al servidor.
+        \item Mide el tiempo en que envió y recibió la respuesta (\texttt{t1} y \texttt{t2}).
+        \item Calcula el tiempo ajustado sumando al tiempo del servidor la mitad de la latencia estimada.
+    \end{itemize}
+    \item \textbf{Ejecución}:
+    \begin{itemize}
+        \item Ejecuta el código en modo servidor (\texttt{python cristian\_algorithm.py server}) para iniciar el servidor.
+        \item Luego, ejecuta en modo cliente (\texttt{python cristian\_algorithm.py client}) para realizar la sincronización.
+    \end{itemize}
+\end{enumerate}
+
+\end{document}
