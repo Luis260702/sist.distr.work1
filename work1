@@ -1,0 +1,216 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Docker Compose and PostgreSQL Replication},
+    pdfpagemode=FullScreen,
+}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!60!black},
+  stringstyle=\color{red},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  captionpos=b,
+  tabsize=2
+}
+
+\title{Configuración de Sistema Distribuido con Docker Compose y PostgreSQL}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Crea un archivo \texttt{docker-compose.yml}}
+El archivo \texttt{docker-compose.yml} describe los servicios de tu sistema distribuido. Este archivo será el núcleo del proyecto.
+
+\begin{enumerate}
+  \item Abre VS Code y crea un nuevo archivo llamado \texttt{docker-compose.yml} en la carpeta de trabajo.
+\end{enumerate}
+
+\begin{lstlisting}[language=yaml,caption={Archivo \texttt{docker-compose.yml}}]
+version: '3.9'
+services:
+  db_leader:
+    image: postgres:15
+    container_name: db_leader
+    environment:
+      POSTGRES_USER: leader_user
+      POSTGRES_PASSWORD: leader_pass
+      POSTGRES_DB: leader_db
+    volumes:
+      - db_leader_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    command: >
+      postgres -c wal_level=replica \
+               -c max_wal_senders=5 \
+               -c wal_keep_size=64MB \
+               -c archive_mode=on \
+               -c archive_command='/bin/true'
+
+  db_follower_1:
+    image: postgres:15
+    container_name: db_follower_1
+    environment:
+      POSTGRES_USER: follower_user
+      POSTGRES_PASSWORD: follower_pass
+      POSTGRES_DB: follower_db
+    volumes:
+      - db_follower_1_data:/var/lib/postgresql/data
+    depends_on:
+      - db_leader
+    command: >
+      postgres -c hot_standby=on
+
+  db_follower_2:
+    image: postgres:15
+    container_name: db_follower_2
+    environment:
+      POSTGRES_USER: follower_user
+      POSTGRES_PASSWORD: follower_pass
+      POSTGRES_DB: follower_db
+    volumes:
+      - db_follower_2_data:/var/lib/postgresql/data
+    depends_on:
+      - db_leader
+    command: >
+      postgres -c hot_standby=on
+
+volumes:
+  db_leader_data:
+  db_follower_1_data:
+  db_follower_2_data:
+\end{lstlisting}
+
+\section*{Configura Write-Ahead Logging (WAL)}
+El WAL ya está configurado con los siguientes parámetros en el \texttt{db\_leader}:
+
+\begin{itemize}
+  \item \texttt{wal\_level=replica}: Permite replicación.
+  \item \texttt{max\_wal\_senders=5}: Soporta hasta 5 seguidores.
+  \item \texttt{wal\_keep\_size=64MB}: Retiene suficientes registros WAL para sincronizar seguidores.
+  \item \texttt{archive\_mode=on} y \texttt{archive\_command='/bin/true'}: Habilita la archivización de logs.
+\end{itemize}
+
+\section*{Configura Segmentación de Logs}
+En PostgreSQL, los logs WAL ya están segmentados automáticamente en bloques manejables (normalmente de 16 MB). No necesitas configurar más para esto.
+
+\section*{Configura Low-Water Mark}
+El \textit{Low-Water Mark} se gestiona limpiando los logs antiguos. Usaremos el parámetro \texttt{wal\_keep\_size} en el líder para controlar la cantidad de logs retenidos.
+
+\section*{Configura Leader-Followers}
+
+\begin{itemize}
+  \item Los nodos \texttt{db\_follower\_1} y \texttt{db\_follower\_2} actúan como seguidores del líder.
+  \item Después de desplegar los servicios, configuraremos la replicación.
+\end{itemize}
+
+\section*{Despliega los servicios}
+
+\begin{enumerate}
+  \item Ejecuta Docker Compose:
+    \begin{itemize}
+      \item Abre una terminal en la carpeta donde está el archivo \texttt{docker-compose.yml}.
+      \item Ejecuta:
+\begin{lstlisting}[language=bash]
+docker-compose up -d
+\end{lstlisting}
+      \item Esto descargará las imágenes de PostgreSQL y creará los contenedores.
+    \end{itemize}
+  \item Verifica que los servicios están en ejecución:
+\begin{lstlisting}[language=bash]
+docker ps
+\end{lstlisting}
+    Debes ver los contenedores \texttt{db\_leader}, \texttt{db\_follower\_1} y \texttt{db\_follower\_2}.
+\end{enumerate}
+
+\section*{Configura la replicación manualmente}
+
+\begin{enumerate}
+  \item Conéctate al líder:
+    \begin{itemize}
+      \item Abre un shell en el contenedor del líder:
+\begin{lstlisting}[language=bash]
+docker exec -it db_leader psql -U leader_user -d leader_db
+\end{lstlisting}
+      \item Ejecuta los siguientes comandos para permitir la replicación:
+\begin{lstlisting}[language=sql]
+CREATE ROLE replicator REPLICATION LOGIN PASSWORD 'replica_pass';
+\end{lstlisting}
+    \end{itemize}
+  \item Configura los seguidores:
+    \begin{itemize}
+      \item Detén temporalmente los seguidores:
+\begin{lstlisting}[language=bash]
+docker stop db_follower_1 db_follower_2
+\end{lstlisting}
+      \item Copia los datos del líder a los seguidores:
+\begin{lstlisting}[language=bash]
+docker exec db_leader pg_basebackup -h localhost -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R
+\end{lstlisting}
+      \item Inicia los seguidores:
+\begin{lstlisting}[language=bash]
+docker start db_follower_1 db_follower_2
+\end{lstlisting}
+    \end{itemize}
+  \item Verifica la replicación:
+    \begin{itemize}
+      \item Conéctate al líder y consulta el estado de la replicación:
+\begin{lstlisting}[language=sql]
+SELECT * FROM pg_stat_replication;
+\end{lstlisting}
+    \end{itemize}
+\end{enumerate}
+
+\section*{Prueba el sistema}
+
+\begin{enumerate}
+  \item Inserta datos en el líder:
+    \begin{itemize}
+      \item Conéctate al líder:
+\begin{lstlisting}[language=bash]
+docker exec -it db_leader psql -U leader_user -d leader_db
+\end{lstlisting}
+      \item Inserta datos:
+\begin{lstlisting}[language=sql]
+CREATE TABLE test (id SERIAL PRIMARY KEY, data TEXT);
+INSERT INTO test (data) VALUES ('hello'), ('world');
+\end{lstlisting}
+    \end{itemize}
+  \item Verifica en los seguidores:
+    \begin{itemize}
+      \item Conéctate a uno de los seguidores:
+\begin{lstlisting}[language=bash]
+docker exec -it db_follower_1 psql -U follower_user -d follower_db
+\end{lstlisting}
+      \item Consulta los datos:
+\begin{lstlisting}[language=sql]
+SELECT * FROM test;
+\end{lstlisting}
+    \end{itemize}
+\end{enumerate}
+
+\section*{Conclusión}
+
+Este sistema ahora implementa las técnicas mencionadas:
+\begin{itemize}
+  \item WAL asegura la integridad de datos.
+  \item Segmentación de logs facilita la administración.
+  \item Low-Water Mark optimiza almacenamiento.
+  \item Leader-Followers asegura redundancia.
+\end{itemize}
+
+\end{document}
